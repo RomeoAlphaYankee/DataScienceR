@@ -71,6 +71,31 @@ ggplot(mtcars, aes(x = factor(cyl), fill = factor(am))) +
                     values = val,
                     labels = lab)
 
+# Jitter plot ot avoid overplotting
+mtcars %>%
+  ggplot(aes(x = cyl, y = wt)) +
+  geom_point(position = position_jitter(0.1))
+
+# Plot a histogram of MPG
+mtcars %>%
+  ggplot(aes(x = mpg)) +
+  geom_histogram(aes(y = ..density..), binwidth = 1, fill = "#377EB8")
+
+# Create a barplot of cylinders by transmission which overlap
+mtcars %>% 
+  ggplot(aes(x = factor(cyl), fill = factor(am))) +
+  geom_bar(position = position_dodge(width = 0.5), alpha = 0.6)
+
+# Use qplot to make a quick plot
+qplot(wt, mpg, data = mtcars)
+
+qplot(x = factor(cyl), data = mtcars, xlab = "Cylinders")
+
+qplot(x = factor(cyl), y = factor(vs), data = mtcars, geom = "jitter")
+
+qplot(factor(cyl), wt, data = mtcars, fill = factor(am), geom = "dotplot",
+      binaxis = "y", stackdir = "center")
+
 # Explore the diamonds dataset
 data("diamonds")
 
@@ -156,3 +181,44 @@ ggplot(iris.wide, aes(x = Length, y = Width, col = Part)) +
 ggplot(iris.long, aes(x = Species, y = Value, col = Part)) +
   geom_jitter() +
   facet_grid(. ~ Measure)
+
+# Use qplot for basic plots
+qplot(Sepal.Length, Sepal.Width, data = iris, color = Species, alpha = I(0.5), geom = "jitter")
+
+# Explore the economic data in the ggplot2 packcage
+data("economics")
+
+head(economics)
+
+# Calculate and plot unemployment percentage rate
+economics %>%
+  ggplot(aes(x = date, y = unemploy / pop)) +
+  geom_line()
+
+# Add recession data
+recess <- data.frame(begin = as.Date(c('1969-12-01', '1973-11-01', '1980-01-01', '1981-07-01', '1990-07-01', '2001-03-01', '2008-07-01'), format = "%Y-%m-%d"),
+                     end = as.Date(c('1970-11-01', '1975-03-01', '1980-07-01', '1982-11-01', '1991-03-01', '2001-11-01', '2009-07-01'), format = "%Y-%m-%d"))
+
+# Replot with recessions in shaded areas
+economics %>%
+  ggplot(aes(x = date, y = unemploy / pop)) + 
+  geom_rect(data = recess, aes(xmin = begin, xmax = end, ymin = -Inf, ymax = +Inf),
+            inherit.aes = FALSE, color = "red", alpha = 0.2) +
+  geom_line()
+
+# A plot to explore the weight of chickens, and determine which diet is best
+data("ChickWeight")
+
+ggplot(ChickWeight, aes(x = Time, y = weight, color = Diet)) +
+  geom_line(aes(group = Chick), alpha = 0.3) + 
+  geom_smooth(lwd = 2, se = FALSE)
+
+library(broom)
+mod <- lm(weight ~ Time, data = ChickWeight)
+augment(mod)
+
+mod.summary <- summary(mod)
+mod.summary$r.squared
+
+glance(mod)$r.squared
+mod$residuals
