@@ -212,13 +212,3 @@ data("ChickWeight")
 ggplot(ChickWeight, aes(x = Time, y = weight, color = Diet)) +
   geom_line(aes(group = Chick), alpha = 0.3) + 
   geom_smooth(lwd = 2, se = FALSE)
-
-library(broom)
-mod <- lm(weight ~ Time, data = ChickWeight)
-augment(mod)
-
-mod.summary <- summary(mod)
-mod.summary$r.squared
-
-glance(mod)$r.squared
-mod$residuals
