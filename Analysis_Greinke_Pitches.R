@@ -1,5 +1,6 @@
 # Pitch Analysis of Zach Greinke's 2015 season
-# This analysis will cover pitch types, velocity over time, locations, etc..
+# This analysis will cover pitch types, velocity over time, pitch selection for given counts,
+# pitch selection early vs. late in games, locations, etc..
 library(dplyr)
 library(ggplot2)
 library(tidyr)
@@ -133,6 +134,77 @@ table(greinke$pitch_type, greinke$month)
 round(prop.table(table(greinke$pitch_type, greinke$month), margin = 2), 3)
 
 # Specifically look at the proportion of pitches in July vs. all other months combined
-round(prop.table(table(greinke$pitch_type, greinke$july), margin = 2), 3)
+type_prop <- round(prop.table(table(greinke$pitch_type, greinke$july), margin = 2), 3)
+type_prop <- as.data.frame(type_prop)
+type_prop <- spread(type_prop, Var2, Freq)
 
+type_prop$Difference <- (type_prop$july - type_prop$other) / type_prop$other
 
+# Plot the change in pitch selection in the month of July
+barplot(type_prop$Difference, names.arg = type_prop$Var1, 
+        main = "Pitch Usage in July vs. Other Months", 
+        ylab = "Percentage Change in July", 
+        ylim = c(-0.3, 0.3))
+
+# Explore the pitch usage across ball-strike counts
+# Create a ball-strike count column
+greinke$bs_count <- paste(greinke$balls, greinke$strikes, sep = "-")
+
+# Create bs_count_tab
+bs_count_tab <- table(greinke$bs_count, greinke$july)
+bs_count_tab
+
+# Create bs_month
+bs_month <- round(prop.table(bs_count_tab, margin = 2),3)
+
+# Print bs_month
+bs_month
+diff_bs <- round((bs_month[ , 1] - bs_month[ , 2]) / bs_month[ , 2], 3)
+
+# Create a bar plot of the changes
+barplot(diff_bs, main = "Ball-Strike Count Rate in July vs. Other Months", 
+        ylab = "Percentage Change in July", ylim = c(-0.15, 0.15), las = 2)
+
+# Clearly there were more batter friendly counts in July
+# Examine pitch selection
+type_bs <- table(greinke$pitch_type, greinke$bs_count)
+
+round(prop.table(type_bs, margin = 2), 3)
+
+# Investigate if pitch selection changes late in game
+greinke$late <- ifelse(greinke$inning > 5, 1, 0)
+
+late_table <- round(prop.table(table(greinke$pitch_type, factor(greinke$late)), margin = 2), 3)
+late_table <- t(late_table)
+rownames(late_table) <- c("Early", "Late")
+
+# Plot early pitch selection against later pitch selection
+barplot(late_table, beside = TRUE, col = c("red", "blue"), 
+        main = "Early vs. Late In Game Pitch Selection",
+        ylab = "Pitch Selection Proportion",
+        legend = rownames(late_table))
+
+# Investigate pitch location
+greinke %>% group_by(batter_stand, pitch_type) %>%
+  summarise(avg_pitch_height = mean(pz) * 12) %>%
+  spread(batter_stand, avg_pitch_height) 
+
+# Look at pitch height in July vs. other months
+tapply(greinke$pz, greinke$july, mean) * 12
+
+# Separate the data into left and right handed batters
+greinke_lhb <- subset(greinke, batter_stand == "L")
+greinke_rhb <- subset(greinke, batter_stand == "R")
+
+# Compare the average horizontal position for RHB vs. LHB for the month of July and other months
+tapply(greinke_lhb$px, greinke_lhb$july, mean) * 12
+tapply(greinke_rhb$px, greinke_rhb$july, mean) * 12
+
+# Plot pitch location window
+plot(x = c(-2, 2), y = c(0, 5), type = "n",
+     main = "Greinke Locational Zone Proportions",
+     xlab = "Horizontal Location (ft.; Catcher's View)",
+     ylab = "Vertical Location (ft.)")
+
+# Add the grid lines
+grid(lty = "solid", col = "black")
