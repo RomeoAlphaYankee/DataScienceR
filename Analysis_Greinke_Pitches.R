@@ -343,7 +343,7 @@ swing %>%
 # Bin the pitch location data
 pitch_bins <- greinke %>%
   filter(px > -2 & px < 2 & pz > 0 & pz < 5) %>%
-  select(batter_stand, pitch_type, px, pz) %>%
+  select(batter_stand, pitch_type, start_speed, px, pz) %>%
   mutate(x_bin = as.numeric(cut(px, seq(-2, 2, 1), include.lowest = TRUE)),
          y_bin = as.numeric(cut(pz, seq(0, 5, 1), include.lowest = TRUE))) 
 
@@ -380,3 +380,84 @@ pitch_bins %>%
   ggtitle("Left Batter View") +
   theme_classic() +
   scale_x_discrete( labels = c(-2, 1, 1, 2))
+
+# Let's make it easier to plot and analyze pitch locations by creating a pitch location grid
+# Create vector px
+px <- rep(seq(-1.5, 1.5, 1), times = 5)
+
+# Create vector pz
+pz <- rep(seq(4.5, 0.5, -1), each = 4)
+
+# Create vector of zone numbers
+zone <- seq(1, 20, 1)
+
+# Create locgrid for plotting
+locgrid <- data.frame(zone = zone, px = px, pz = pz)
+
+# Create a bin template to inner_join into our pitch bins
+bin_template <- data.frame(zone = zone, 
+                           x_bin = rep(seq(1, 4, 1), times = 5), 
+                           y_bin = rep(seq(1, 5, 1), each = 4))
+
+# Inner join to create a column with the pitch location zones
+pitch_bins <- pitch_bins %>% left_join(bin_template, on = c(x_bin = x_bin, y_bin = y_bin))
+
+head(pitch_bins)
+
+# Load the gridExtra package
+library(gridExtra)
+library(RColorBrewer)
+
+# Generate a clean data frame with contact data for left and right handed batters
+# then assign a bin and replace the px and pz data with the grid coordinates
+swings <- swing %>%
+  filter(px > -2 & px < 2 & pz > 0 & pz < 5) %>%
+  select(batter_stand, pitch_type, atbat_result, px, pz, balls, strikes, contact, batted_ball_velocity) %>%
+  mutate(x_bin = as.numeric(cut(px, seq(-2, 2, 1), include.lowest = TRUE)),
+         y_bin = as.numeric(cut(pz, seq(0, 5, 1), include.lowest = TRUE))) %>%
+  left_join(bin_template, on = c(x_bin = x_bin, y_bon = y_bin)) %>%
+  select(batter_stand, pitch_type, atbat_result, balls, strikes, contact, batted_ball_velocity, x_bin, y_bin, zone) %>%
+  left_join(locgrid, on = c(zone = zone))
+
+head(swings)
+
+# Let's use our new swings data frame to plot some contact grids
+swings %>%
+  group_by(batter_stand, zone) %>%
+  mutate(contact_rate = mean(contact)) %>%
+  ungroup() %>%
+  ggplot(aes(x = px, y = pz)) +
+  geom_tile(aes(fill = contact_rate)) +
+  scale_fill_gradientn(name = "contact_rate", 
+                       limits = c(0.5, 1), 
+                       breaks = seq(from = 0.5, to = 1, by = 0.1), 
+                       colors = c(brewer.pal(n = 7, name = "Reds"))) +
+  xlim(-2, 2) + ylim(0, 5) +
+  ggtitle("Contact Rates") +
+  labs(x = "Horizontal Location (ft.)", y = "Vertical Location (ft.)") +
+  geom_text(aes(x = px, y = pz, label = round(contact_rate, 3))) +
+  annotate("rect", xmin = -1, xmax = 1, ymin = 1, ymax = 4, col = "blue", fill = 0) +
+  facet_grid(~batter_stand)
+
+# Explore batted ball exit velocity
+tapply(swings$batted_ball_velocity, INDEX = swings$atbat_result, FUN = mean, na.rm = TRUE)
+
+subset(swings, subset = contact == 1 & !is.na(batted_ball_velocity))
+
+# Lets build a plot of exit velocities
+swings %>%
+  filter(contact == 1 & !is.na(batted_ball_velocity)) %>%
+  group_by(batter_stand, zone) %>%
+  mutate(exit_speed = mean(batted_ball_velocity)) %>%
+  ungroup() %>%
+  ggplot(aes(x = px, y = pz)) +
+  geom_tile(aes(fill = exit_speed)) +
+  scale_fill_gradientn(name = "exit_speed", 
+                       limits = c(50, 100), 
+                       breaks = seq(from = 50, to = 100, by = 10), 
+                       colors = c(brewer.pal(n = 5, name = "Reds"))) +
+  facet_grid(~batter_stand) +
+  geom_text(aes(x = px, y = pz, label = round(exit_speed))) +
+  annotate("rect", xmin = -1, xmax = 1, ymin = 1, ymax = 4, col = "blue", fill = 0) +
+  ggtitle("Batted Ball Exit Velocity") +
+  labs(x = "Horizontal Position From Center of Plate", y = "Vertical Distance From Plate")
