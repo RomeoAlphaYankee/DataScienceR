@@ -1,6 +1,13 @@
 # Pitch Analysis of Zach Greinke's 2015 season
 # This analysis will cover pitch types, velocity over time, pitch selection for given counts,
-# pitch selection early vs. late in games, locations, etc..
+# pitch selection early vs. late in games, locations, etc.. Focus will be on Zack Greinke's excellent
+# 2015 season, and July in particular. Later, there are heat maps with contact rate across the plate, 
+# and average exit velocity.
+
+# Work on pitch location is not found in this code, but can be found online 
+# at https://rmathis.shinyapps.io/pitchfxwebapp/ as an interactive app.
+
+# Load basic packages, more added later as needed
 library(dplyr)
 library(ggplot2)
 library(tidyr)
@@ -428,7 +435,7 @@ swings %>%
   ungroup() %>%
   ggplot(aes(x = px, y = pz)) +
   geom_tile(aes(fill = contact_rate)) +
-  scale_fill_gradientn(name = "contact_rate", 
+  scale_fill_gradientn(name = "Contact Rate", 
                        limits = c(0.5, 1), 
                        breaks = seq(from = 0.5, to = 1, by = 0.1), 
                        colors = c(brewer.pal(n = 7, name = "Reds"))) +
@@ -452,9 +459,9 @@ swings %>%
   ungroup() %>%
   ggplot(aes(x = px, y = pz)) +
   geom_tile(aes(fill = exit_speed)) +
-  scale_fill_gradientn(name = "exit_speed", 
-                       limits = c(50, 100), 
-                       breaks = seq(from = 50, to = 100, by = 10), 
+  scale_fill_gradientn(name = "Exit Speed", 
+                       limits = c(60, 100), 
+                       breaks = seq(from = 60, to = 100, by = 5), 
                        colors = c(brewer.pal(n = 5, name = "Reds"))) +
   facet_grid(~batter_stand) +
   geom_text(aes(x = px, y = pz, label = round(exit_speed))) +
