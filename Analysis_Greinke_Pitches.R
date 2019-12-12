@@ -208,3 +208,175 @@ plot(x = c(-2, 2), y = c(0, 5), type = "n",
 
 # Add the grid lines
 grid(lty = "solid", col = "black")
+
+# Or we could do it with ggplot2
+p <- greinke %>%
+  filter(bs_count == "0-2") %>%
+  ggplot(aes(x = px, y = pz, size = start_speed)) +
+  geom_point(aes(color = pitch_type), alpha = 0.6) +
+  annotate("rect", ymin = 1.5, ymax = 3.4, xmin = -0.83, xmax = 0.83, color = "blue", alpha = 0.2) +
+  labs(title = "Greinke Pitch Location on 0-2 Count", 
+       x = "Horizontal Location (ft. from plate)",
+       y = "Vertical Location (ft.)",
+       color = "Pitch") +
+  facet_grid(~batter_stand)
+
+# Use the plotly library to make the chart interactive
+library(plotly)
+ggplotly(p)
+
+
+greinke %>%
+  select(all) %>%
+  ggplot(aes(x = pitch_type, y = start_speed)) +
+  geom_boxplot()
+
+# Examine at bat results to determine if increased fastball velocity resulted in lower contact rate
+greinke_ff$bs_count <- paste(greinke_ff$balls, greinke_ff$strikes, sep = "-")
+
+# Create a vector of no swing results
+no_swing <- c("Ball", "Called Strike", "Ball In Dirt", "Hit By Pitch")
+
+# Create a variable which is TRUE if the batter took a hack
+greinke_ff$batter_swing <- ifelse(greinke_ff$pitch_result %in% no_swing, 0, 1)
+
+# Create a subset of fastball pitches for batter swings
+swing_ff <- subset(greinke_ff, greinke_ff$batter_swing == 1)
+
+# Create a contact variable
+no_contact <- c("Swinging Strike", "Missed Bunt")
+swing_ff$contact <- ifelse(swing_ff$pitch_result %in% no_contact, 0, 1)
+
+# find the mean 4-seam fastball velocity
+mean(swing_ff$start_speed)
+
+# Bin the velocities
+swing_ff$velo_bin <- ifelse(swing_ff$start_speed < 90.5, "Slow", NA)
+swing_ff$velo_bin <- ifelse(swing_ff$start_speed >= 90.5 & swing_ff$start_speed < 92.5, "Medium", swing_ff$velo_bin)
+swing_ff$velo_bin <- ifelse(swing_ff$start_speed > 92.5, "Fast", swing_ff$velo_bin)
+
+# Aggregate contact rate by velocity bin
+tapply(X = swing_ff$contact, INDEX = swing_ff$velo_bin, FUN = mean)
+
+# Examine the contact rate across pitch types
+swing <- greinke[-which(greinke$pitch_result %in% no_swing), ]
+
+table(swing$pitch_result)
+
+# Create the contact column
+swing$contact <- ifelse(swing$pitch_result %in% no_contact, 0, 1)
+
+# contact rate by pitch type
+swing %>%
+  group_by(pitch_type) %>%
+  summarize(contact_rate = mean(contact))
+  
+# Write a function to check the contact rate across quantiles
+thirds = c(0, 1/3, 2/3, 1)
+
+nrow(swing)
+
+# Apply quantile function
+lapply(split(swing$start_speed, as.factor(swing$pitch_type)), FUN = quantile, probs = thirds)
+
+# Could have used tapply
+tapply(swing$start_speed, INDEX = swing$pitch_type, FUN = quantile, probs = thirds)
+
+# In order to have a dataframe instead of a list, write a for loop to function over the pitch types
+types <- unique(swing$pitch_type)
+
+pitch_quantiles <- NULL
+
+for(type in types){
+  pitch_quantiles <- cbind(pitch_quantiles, quantile(swing$start_speed[swing$pitch_type == type], probs = thirds))
+}
+
+# Clean up and print
+colnames(pitch_quantiles) <- types
+pitch_quantiles
+
+# Trying a different way to bin pitch quantiles within the swing dataframe
+bin_pitch_speed <- function(start_speed){
+  as.integer(cut(start_speed, quantile(start_speed, probs = thirds), include.lowest = TRUE))
+}
+
+# Test it
+mean(bin_pitch_speed(swing$start_speed[swing$pitch_type == "CU"]))
+
+# Apply it to make sure it works for all pitches
+tapply(swing$start_speed, INDEX = swing$pitch_type, FUN = bin_pitch_speed)
+
+# Create a dummy variable
+swing$velo_bin <- NA
+
+# Loop over the pitch types and bin the velocities
+for(type in types){
+  swing$velo_bin[swing$pitch_type == type] <- bin_pitch_speed(swing$start_speed[swing$pitch_type == type])
+}
+
+# Maybe there was an easier way to do that with dplyr
+swing <- swing %>%
+  group_by(pitch_type) %>%
+  mutate(velo_bin = bin_pitch_speed(start_speed))
+
+# Check the results by binned velocity
+swing %>%
+  group_by(pitch_type, velo_bin) %>%
+  summarize(contact_rate = mean(contact)) %>%
+  spread(velo_bin, contact_rate)
+
+# Check for differences for right vs. left batters
+swing %>%
+  group_by(batter_stand, pitch_type, velo_bin) %>%
+  summarize(contact_rate = mean(contact)) %>%
+  spread(velo_bin, contact_rate)
+
+# How many pitches of each type were thrown with a 2 strike count
+table(swing[swing$strikes == 2, "pitch_type"])
+
+# Create a table detailing contact rate of each pitch type in a two strike count
+swing %>%
+  filter(strikes ==2) %>%
+  group_by(pitch_type) %>%
+  summarize(avg = mean(contact))
+
+# Bin the pitch location data
+pitch_bins <- greinke %>%
+  filter(px > -2 & px < 2 & pz > 0 & pz < 5) %>%
+  select(batter_stand, pitch_type, px, pz) %>%
+  mutate(x_bin = as.numeric(cut(px, seq(-2, 2, 1), include.lowest = TRUE)),
+         y_bin = as.numeric(cut(pz, seq(0, 5, 1), include.lowest = TRUE))) 
+
+head(pitch_bins, 10)
+
+# Create a table of counts of pitch locations
+bin_tab <- table(pitch_bins$y_bin, pitch_bins$x_bin)
+bin_tab
+
+# Convert to a proportion table
+pitch_prop <- round(prop.table(bin_tab), 3)
+as.data.frame(pitch_prop)
+
+# Convert to a data frame and plot
+data.frame(pitch_prop) %>%
+  ggplot(aes(x = Var2, y = Var1, label = Freq)) +
+  geom_text(size = 10) +
+  annotate("rect", xmin = 1.5, xmax = 3.5, ymin = 1.5, ymax = 4.5, col = "blue", fill = 0) +
+  labs(x = "Pitch location from center of plate", y = "Pitch height from plate")
+  
+# Complete the whole process in one step
+# Select left batters
+pitch_bins %>%
+  filter(batter_stand == "L") %>%
+  select(y_bin, x_bin) %>%
+  table() %>%
+  prop.table() %>%
+  round(3) %>%
+  as.data.frame() %>%
+  ggplot(aes(x = x_bin, y = y_bin, label = Freq)) +
+  geom_text(size = 10) +
+  annotate("rect", xmin = 1.5, xmax = 3.5, ymin = 1.5, ymax = 4.5, col = "blue", fill = 0) +
+  labs(x = "Pitch location from center of plate", y = "Pitch height from plate") +
+  ggtitle("Left Batter View") +
+  theme_classic() +
+  scale_x_discrete( labels = c(-2, 1, 1, 2))
