@@ -29,6 +29,7 @@ names(atbat)
 
 pitch <- dat$pitch
 names(pitch)
+pitch$tfs
 
 head(atbat)
 head(pitch)
@@ -39,7 +40,7 @@ nh <- inner_join(atbat, pitch, by = "num", suffix = c("_bat", "_pitch"))
 # Filter and select the data needed for pitch plot
 nh <- nh %>%  
   filter(inning_side_pitch == "top") %>%
-  select(num, start_tfs, stand, event, inning_pitch , batter_name, des, tfs, start_speed, px, pz, pitch_type)
+  select(num, tfs, stand, event, inning_pitch, batter_name, des, tfs, start_speed, px, pz, pitch_type, count)
 
 dim(nh)
 names(nh)
@@ -168,7 +169,7 @@ nh %>%
   ggtitle(paste0("Inning ", inning, ": ", batter)) +
   geom_text(aes(label = pitch_result, x = px, y = pz), nudge_y = .15) +
   xlim(-2, 2) + ylim(0, 5)
-
+  
 
 # Focus on speciffically on Jose Tabata ih the ninth inning
 batter <- "Jose Tabata"
@@ -203,7 +204,101 @@ nh %>%
   ggtitle("Five Most Inside Pitches")
 
 # Pitch count by at-bat in descending order
+nh <- nh %>%
+  arrange(tfs) 
+
+# Sequence the pitches
+pitches <- nh %>% 
+  arrange(num) %>%
+  count(num) 
+
+nh %>% select(num, batter_name, balls, strikes, pitch_seq)
+
+nh$pitch_seq <- unlist(lapply(pitches$n, seq))
+
+# Now we can plot and analyze pitch sequences
+batter <- "Pedro Alvarez"
+inning <- 5
+
 nh %>%
-  count(num) %>%
-  arrange(desc(n))
-tail(nh)
+  filter(batter_name == batter, inning_pitch == inning) %>%
+  ggplot(aes(x = px, y = pz)) +
+  geom_point(aes(size = start_speed, color = pitch_description)) +
+  scale_size(range = c(0.5, 2.5)) +
+  scale_color_manual(values = c(Fastball = "red2", Slider = "orange", Cutter = "yellow2", Changeup = "green", Curveball = "blue")) +
+  geom_path(data = sz, aes(x = x, y = z), lty = 2) +
+  coord_equal() +
+  labs(x = "Horizontal Position (ft.)", y = "Vertical Position (ft.)",
+       size = "Speed", color = "Pitch") +
+  geom_text(aes(x = stand_xcoord, y = 2.5, label = stand), size = 10) + 
+  ggtitle(paste0("Inning ", inning, ": ", batter)) +
+  geom_text(aes(label = pitch_result, x = px, y = pz), nudge_y = .15) +
+  xlim(-2, 2) + ylim(0, 5) +
+  geom_text(aes(label = pitch_seq, x = px, y = pz), nudge_y = - 0.15)
+
+
+# Plot pitch selection by sequence
+nh %>%
+  group_by(pitch_seq) %>%
+  ggplot(aes(x = factor(pitch_seq), fill = pitch_description)) +
+  geom_bar(position = "fill") +
+  labs(x = "Pitch", y = "Percent Thrown", fill = "Pitch Type") +
+  ggtitle("Pitch Sequence")
+
+# Let's filter it by two strike counts
+library(tidyr)
+nh <- separate(data = nh, col = count, into = c("balls", "strikes"), sep = "-")
+
+nh[1:20, c(1, 2, 12, 13, 14, 17)]
+
+nh %>%
+  filter(strikes == 2) %>% 
+  group_by(pitch_seq) %>%
+  droplevels() %>%
+  ungroup() %>%
+  ggplot(aes(x = factor(pitch_seq), fill = pitch_description)) +
+    geom_bar(position = "fill") +
+    labs(x = "Pitch", y = "Percent Thrown", fill = "Pitch Type") +
+    ggtitle("Pitch Sequence")
+
+# Plot the pitch selection for three ball counts
+nh %>%
+  filter(balls == 3) %>%
+  group_by(pitch_seq) %>%
+  ggplot(aes(x = factor(pitch_seq), fill = pitch_description)) +
+  geom_bar(position = "fill") +
+  ggtitle("Pitch Selection With Tree-Ball Count") +
+  labs(x = "Pitch in Sequence", y = "Pitch Selection", fill = "Pitch Type")
+         
+# Loop over the at-bats to create a scouting report flip-book covering all batters
+# Save each plot to a .png file
+
+# First scale the pitch speeds for consistent sizes across ab plots
+nh$speed_scale <- (nh$start_speed - min(nh$start_speed)) / (max(nh$start_speed) - min(nh$start_speed))
+
+for(i in unique(nh$num)){
+  ab <- nh %>%
+    filter(num == i) 
+  
+  batter <- ab$batter_name[1]
+  inning <- ab$inning_pitch[1]
+  
+  plot <- ab %>%
+    ggplot(aes(x = px, y = pz)) +
+    geom_point(aes(size = start_speed, color = pitch_description)) +
+    scale_size(range = c(min(ab$speed_scale * 2 + 0.5), max(ab$speed_scale * 2 + 0.5))) +
+    scale_color_manual(values = c(Fastball = "red2", Slider = "orange", Cutter = "yellow2", Changeup = "green", Curveball = "blue")) +
+    geom_path(data = sz, aes(x = x, y = z), lty = 2) +
+    coord_equal() +
+    labs(x = "Horizontal Position (ft.)", y = "Vertical Position (ft.)",
+         size = "Speed", color = "Pitch") +
+    geom_text(aes(x = stand_xcoord, y = 2.5, label = stand), size = 10) + 
+    ggtitle(paste0("Inning ", inning, ": ", batter)) +
+    geom_text(aes(label = pitch_result, x = px, y = pz), nudge_y = .15) +
+    xlim(-2, 2) + ylim(0, 5) +
+    geom_text(aes(label = pitch_seq, x = px, y = pz), nudge_y = - 0.15)
+
+# Uncomment print or save plots, or both
+#  print(plot)
+  ggsave(paste("atbat", i, ".png", sep = ""), plot)
+}
