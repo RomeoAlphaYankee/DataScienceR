@@ -168,3 +168,103 @@ wt.cyl.am +
   stat_summary(geom = "point", fun.y = median,
                position = posn.d, size = 3,
                col = "black", shape = "X")
+
+# Zoom a plot without distorting or dropping linear models or confidence intervals
+iris.smooth <- iris %>% ggplot(aes(x = Sepal.Length, y = Sepal.Width, color = Species)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth()
+
+#Base plot
+iris.smooth
+
+# Normal use of x limits
+iris.smooth +
+  xlim(c(4.5, 5.5))
+
+# Zoom to prevent distortion
+iris.smooth +
+  coord_cartesian(xlim = c(4.5, 5.5))
+
+# Using scale x continuous
+p <- ggplot(mtcars, aes(x = wt, y = hp, col = am)) +
+  geom_point() + geom_smooth()
+
+p + scale_x_continuous(limits = c(3, 6), expand = c(0, 0))
+
+p + coord_cartesian(xlim = c(3, 6))
+
+# Adjust the aspect ratio
+base.plot <- ggplot(iris, aes(x = Sepal.Length, y = Sepal.Width, col = Species)) +
+  geom_jitter() +
+  geom_smooth(method = "lm", se = FALSE)
+
+# Base plot default aspect ratio
+base.plot
+
+# Use coord equal to force a 1:1 aspect ratio
+base.plot +
+  coord_equal()
+
+# Create a bar plot
+wide.bar <- ggplot(mtcars, aes(x = 1, fill = cyl)) +
+  geom_bar()
+
+# base plot
+wide.bar
+
+# Convert to polar chart
+wide.bar +
+  coord_polar()
+
+# Convert to pie chart
+wide.bar + 
+  coord_polar(theta = "y")
+
+# Thin bar plot
+thin.bar <- ggplot(mtcars, aes(x = 1, fill = cyl)) +
+  geom_bar(width = 0.1) +
+  scale_x_continuous(limits = c(0.5, 1.5))
+
+thin.bar
+
+# Convert to donut chart
+thin.bar +
+  coord_polar(theta = "y")
+
+# Faceting the mtcars base plot using facet grid
+p <- ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_point()
+
+# By row am
+p + facet_grid(am~.)
+
+# By column cyl
+p + facet_grid(.~cyl)
+
+# rows and cols using am and cyl
+p + facet_grid(am~cyl)
+
+# Use faceting and color to create a multi variable chart
+mtcars$cyl_am <- paste(mtcars$cyl, mtcars$am, sep = "_")
+
+# Generage colors
+myCol <- rbind(brewer.pal(9, "Blues")[c(3, 6, 8)],
+               brewer.pal(9, "Reds")[c(3, 6, 8)])
+
+# Map cyl_am onto col
+ggplot(mtcars, aes(x = wt, y = mpg, col = cyl_am)) +
+  geom_point() +
+  scale_color_manual(values = myCol)
+
+# Grid facet on gear vs. vs
+ggplot(mtcars, aes(x = wt, y = mpg, col = cyl_am)) +
+  geom_point() +
+  scale_color_manual(values = myCol) +
+facet_grid(gear ~ vs)
+
+# Map disp to size
+ggplot(mtcars, aes(x = wt, y = mpg, col = cyl_am, size = disp)) +
+  geom_point() +
+  scale_color_manual(values = myCol) + 
+  facet_grid(gear ~ vs)
+ 
