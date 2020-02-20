@@ -267,4 +267,108 @@ ggplot(mtcars, aes(x = wt, y = mpg, col = cyl_am, size = disp)) +
   geom_point() +
   scale_color_manual(values = myCol) + 
   facet_grid(gear ~ vs)
- 
+
+# Best practices: Bar Plots
+
+# Set factors
+mtcars$cyl <- as.factor(mtcars$cyl)
+mtcars$am <- as.factor(mtcars$am)
+
+# Base plot
+m <- ggplot(mtcars, aes(x = cyl, y = wt))
+
+# Dynamite plot
+m + stat_summary(fun.y = mean, geom = "bar", fill = "skyblue") +
+  stat_summary(fun.data = mean_sdl, fun.args = list(mult = 1), geom = "errorbar", width = 0.1)
+
+# Add transmission type to base plot
+m <- ggplot(mtcars, aes(x = cyl, y = wt, col = am, fill = am))
+
+# Dynamite plot
+m + 
+  stat_summary(fun.y = mean, geom = "bar") +
+  stat_summary(fun.data = mean_sdl, fun.args = list(mult = 1), geom = "errorbar", width = 0.1)
+
+# Dynamite plot w/ position dodge
+m + 
+  stat_summary(fun.y = mean, geom = "bar", position = "dodge") +
+  stat_summary(fun.data = mean_sdl, fun.args = list(mult = 1), geom = "errorbar", width = 0.1, position = "dodge")
+
+# Set the dodge pssn manually
+posn.d <- position_dodge(0.9)
+
+# Rederaw the plot
+m + 
+  stat_summary(fun.y = mean, geom = "bar", position = posn.d) +
+  stat_summary(fun.data = mean_sdl, fun.args = list(mult = 1), geom = "errorbar", width = 0.1, position = posn.d, color = "black")
+
+# Create a summary dataframe for easier and more descriptive plotting
+mtcars.cyl <- mtcars %>%
+  group_by(cyl) %>%
+  summarise(wt.avg = mean(wt), sd = sd(wt), n = n(), prop = n / nrow(mtcars))
+
+# Establish a new base plot using summary data
+m <- ggplot(mtcars.cyl, aes(x = cyl, y = wt.avg))
+
+# Add a geom bar layer
+m + geom_bar(stat = "identity", fill = "skyblue")
+
+# Same plot using geom_col
+m + geom_col(fill = "skyblue", width = mtcars.cyl$prop) +
+  geom_errorbar(aes(ymin = wt.avg - sd, ymax = wt.avg + sd), width = 0.1)
+
+# Bar chart as a replacement for proportional pie charts
+# First the bar chart
+ggplot(mtcars, aes(x = factor(cyl), fill = am)) +
+  geom_bar(position = "fill")
+
+# Convert to pie using geom_polar
+ggplot(mtcars, aes(x = factor(cyl), fill = am)) +
+  geom_bar(position = "fill") +
+  facet_grid(. ~ cyl) + # Facets
+  coord_polar(theta = "y") + # Coordinates
+  theme_void() 
+
+# Parallel coordinates plot using GGally
+library(GGally)
+
+# All columns except am
+group_by_am <- 9
+my_names_am <- (1:11)[-group_by_am]
+
+# Basic parallel plot - each variable plotted as a z-score transformation
+ggparcoord(mtcars, my_names_am, groupColumn = group_by_am, alpha = 0.8)
+
+# SPLOM plot matrix using ggpairs
+mtcars2 <- mtcars[ , c(1, 3, 5, 6, 7)]
+ggpairs(mtcars2)
+
+# Anothor pairs plot using ggpairs
+mtcars3 <- mtcars[ , 1:5]
+
+ggpairs(mtcars3)
+
+# Heat maps: best practices
+myColors <- brewer.pal(9, "Reds")
+
+# Build the heat map
+library(lattice)
+data('barley')
+
+str(barley)
+
+ggplot(barley, aes(x = year,, y = variety, fill = yield)) + 
+  geom_tile() +
+  facet_wrap(~site, ncol = 1) +
+  scale_fill_gradientn(colors = myColors)
+
+# Heat map alternatives, line plot
+ggplot(barley, aes(x = year, y = yield, color = variety, group = variety)) +
+  geom_line() +
+  facet_grid(.~site)
+
+# Heat map alternaties, ribbon plot
+# Create overlapping ribbon plot from scratch
+ggplot(barley, aes(x = year, y = yield, color = site, group = site, fill = site)) + 
+  stat_summary(fun.y = mean, geom = "line") +
+  stat_summary(fun.data = mean_sdl, fun.args = list(mult = 1), geom = "ribbon", col = NA, alpha = 0.1)
