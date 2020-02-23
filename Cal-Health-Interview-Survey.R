@@ -83,3 +83,92 @@ ggplot(DF_melted, aes(x = X, y = value, fill = FILL)) +
   geom_col(position = "stack") +
   BMI_fill +
   facet_grid(FILL ~ .)
+  
+# Marimekko / Mosaic Plot
+# Create a contingency table
+DF <- as.data.frame.matrix(table(adult$SRAGE_P, adult$RBMI))
+
+# Create groupSum, xmax and xmin columns
+DF$groupSum <- rowSums(DF)
+DF$xmax <- cumsum(DF$groupSum)
+DF$xmin <- DF$xmax - DF$groupSum
+
+DF$groupSum <- NULL
+
+# Copy row names to variable X
+DF$X <- row.names(DF)
+
+# Reshape the dataframe
+DF_melted <- melt(DF, id.vars = c("X", "xmin", "xmax"), variable.name = "FILL")
+
+# Calculate ymin and ymax
+DF_melted <- DF_melted %>%
+  group_by(X) %>%
+  mutate(ymax = cumsum(value / sum(value)),
+         ymin = ymax - value / sum(value))
+
+head(DF_melted)
+tail(DF_melted)
+
+# Plot rectangles
+library(ggthemes)
+ggplot(DF_melted, aes(ymin = ymin,
+                      ymax = ymax,
+                      xmin = xmin,
+                      xmax = xmax,
+                      fill = FILL)) +
+  geom_rect(colour = "white") +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  BMI_fill +
+  theme_tufte()
+
+# Create a plot that visualizes under and over representation
+# Perform chi.sq test (RBMI and SRAGE_P)
+results <- chisq.test(table(adult$RBMI, adult$SRAGE_P))
+
+# Melt results$residuals and store as resid
+resid <- melt(results$residuals)
+
+# Change names of resid
+colnames(resid) <- c("FILL", "X", "residual")
+
+# merge the two datasets:
+DF_all <- merge(DF_melted, resid)
+
+# Update plot command
+P <- ggplot(DF_all, aes(ymin = ymin,
+                      ymax = ymax,
+                      xmin = xmin,
+                      xmax = xmax,
+                      fill = residual)) +
+  geom_rect() +
+  scale_fill_gradient2() +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  theme_tufte()
+
+P
+
+# Position for labels on y axis
+index <- DF_all$xmax == max(DF_all$xmax)
+DF_all$yposn <- DF_all$ymin[index] + (DF_all$ymax[index] - DF_all$ymin[index])/2
+
+# Geom_text for BMI 
+p1 <- P %+% DF_all + 
+  geom_text(aes(x = max(xmax), 
+                y = yposn,
+                label = FILL),
+            size = 3, hjust = 1,
+            show.legend  = FALSE)
+p1
+
+# Position for labels on x axis
+DF_all$xposn <- DF_all$xmin + (DF_all$xmax - DF_all$xmin)/2
+
+# geom_text for ages 
+p1 %+% DF_all + 
+  geom_text(aes(x = xposn, label = X),
+            y = 1, angle = 90,
+            size = 3, hjust = 1,
+            show.legend = FALSE)
