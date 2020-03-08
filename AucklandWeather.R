@@ -115,4 +115,3 @@ rainy_days %>%
 # Percent of rainy days 
 rainy_days %>%
   summarize(days_rainy = mean(any_rain))
-
