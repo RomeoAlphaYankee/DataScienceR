@@ -1,5 +1,5 @@
 # DataScienceR
-Data Science Scripts.  
+Data Science Scripts:
 
 Some examples of code I have written while working through various data science challenges. These include data manipulation, exploratory data analysis, data visualization, and various modeling techniques.
 
