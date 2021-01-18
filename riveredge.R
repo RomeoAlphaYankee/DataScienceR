@@ -27,8 +27,11 @@ ti %>% mutate(date = ymd(week)) %>%
 ti %>% mutate(date = ymd(week)) %>% 
   mutate(year = year(date)) %>%
   ggplot(aes(x = date, y = data)) + 
-  geom_line() +
-  ggtitle("Google Searches for Thousand Islands")
+  geom_line(color = "blue", lwd = 1.25) +
+  ggtitle("Google Searches for Thousand Islands",
+          "2020 vs. 2019") +
+  xlab("Date") +
+  ylab("Searches")
 
 
 rr <- read_csv("C:/Users/angel/Downloads/Analytics Riveredge Resort Pages 20171205-20201211.csv", skip = 19)
@@ -62,5 +65,7 @@ str(rr)
 rr %>% filter(month >= 6, month <= 10) %>%
   ggplot(aes(x = month, y = Pageviews, fill = factor(year))) +
   geom_col(position = "dodge") + 
-  ggtitle("Web Traffic to Riveredge Resort") +
+  ggtitle("Web Traffic to Riveredge Resort",
+          "Page Views 2018 - 2020") +
+  xlab("Month") +
   labs(fill = "Year")
